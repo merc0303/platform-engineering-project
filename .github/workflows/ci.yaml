@@ -41,12 +41,12 @@ jobs:
           OWNER=$(echo "${{ github.repository_owner }}" | tr 'A-Z' 'a-z')
           docker build -t ghcr.io/$OWNER/${{ matrix.svc }}:${{ github.sha }} microservices/${{ matrix.svc }}
       - name: Trivy vulnerability scan (fails on HIGH/CRITICAL)
-        uses: aquasecurity/trivy-action@0.28.0
-        with:
-          image-ref: ghcr.io/${{ github.repository_owner }}/${{ matrix.svc }}:${{ github.sha }}
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: "1"
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr 'A-Z' 'a-z')
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:latest image \
+            --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 \
+            ghcr.io/$OWNER/${{ matrix.svc }}:${{ github.sha }}
       - name: Push (main only)
         if: github.ref == 'refs/heads/main'
         run: |
