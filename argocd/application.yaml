@@ -1,0 +1,13 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata: {name: shop, namespace: argocd}
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/merc0303/platform-engineering-project.git
+    targetRevision: main
+    path: kubernetes
+  destination: {server: https://kubernetes.default.svc, namespace: shop}
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions: [CreateNamespace=true]

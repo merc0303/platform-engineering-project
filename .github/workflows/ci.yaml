@@ -1,0 +1,67 @@
+name: ci
+on:
+  push: {branches: [main]}
+  pull_request:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: {svc: [users-service, orders-service, inventory-service]}
+    defaults: {run: {working-directory: "microservices/${{ matrix.svc }}"}}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -r requirements.txt
+      - run: flake8 app.py --max-line-length 100
+      - run: pytest -q
+
+  iac-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform -chdir=terraform init -backend=false && terraform -chdir=terraform validate
+      - run: pip install yamllint && yamllint -d relaxed kubernetes monitoring argocd ansible
+
+  build-scan-push:
+    needs: [test]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: {svc: [users-service, orders-service, inventory-service]}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr 'A-Z' 'a-z')
+          docker build -t ghcr.io/$OWNER/${{ matrix.svc }}:${{ github.sha }} microservices/${{ matrix.svc }}
+      - name: Trivy vulnerability scan (fails on HIGH/CRITICAL)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ghcr.io/${{ github.repository_owner }}/${{ matrix.svc }}:${{ github.sha }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Push (main only)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          docker push ghcr.io/$(echo "${{ github.repository_owner }}" | tr 'A-Z' 'a-z')/${{ matrix.svc }}:${{ github.sha }}
+
+  gitops-update:
+    if: github.ref == 'refs/heads/main'
+    needs: [build-scan-push, iac-validate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bump image tags in Git (ArgoCD picks this up)
+        run: |
+          sed -i -E "s/newTag: [^}]*/newTag: ${{ github.sha }}/" kubernetes/kustomization.yaml
+          git config user.name "ci-bot"; git config user.email "ci-bot@users.noreply.github.com"
+          git commit -am "deploy: ${{ github.sha }} [skip ci]" || exit 0
+          git push

@@ -1,0 +1,42 @@
+# Bootstraps the platform: monitoring stack, ArgoCD, alert rules.
+# Run: ansible-playbook ansible/install_monitoring.yml
+# Requires: ansible-galaxy collection install kubernetes.core
+- name: Bootstrap platform components
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Add Helm repos
+      kubernetes.core.helm_repository:
+        name: "{{ item.name }}"
+        repo_url: "{{ item.url }}"
+      loop:
+        - {name: prometheus-community, url: https://prometheus-community.github.io/helm-charts}
+        - {name: argo, url: https://argoproj.github.io/argo-helm}
+
+    - name: Install kube-prometheus-stack (Prometheus, Grafana, Alertmanager)
+      kubernetes.core.helm:
+        name: kube-prometheus-stack
+        chart_ref: prometheus-community/kube-prometheus-stack
+        release_namespace: monitoring
+        create_namespace: true
+        wait: true
+
+    - name: Install ArgoCD
+      kubernetes.core.helm:
+        name: argocd
+        chart_ref: argo/argo-cd
+        release_namespace: argocd
+        create_namespace: true
+        wait: true
+
+    - name: Apply scrape config and alert rules
+      kubernetes.core.k8s:
+        state: present
+        src: "{{ playbook_dir }}/../monitoring/{{ item }}"
+      loop: [servicemonitor.yaml, alert-rules.yaml]
+
+    - name: Register the GitOps application
+      kubernetes.core.k8s:
+        state: present
+        src: "{{ playbook_dir }}/../argocd/application.yaml"

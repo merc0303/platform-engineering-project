@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - network-policy-default-deny.yaml
+  - ingress.yaml
+  - users-service.yaml
+  - orders-service.yaml
+  - inventory-service.yaml
+images:
+  - {name: ghcr.io/merc0303/users-service, newTag: latest}
+  - {name: ghcr.io/merc0303/orders-service, newTag: latest}
+  - {name: ghcr.io/merc0303/inventory-service, newTag: latest}
