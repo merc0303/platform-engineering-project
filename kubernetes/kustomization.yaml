@@ -8,6 +8,6 @@ resources:
   - orders-service.yaml
   - inventory-service.yaml
 images:
-  - {name: ghcr.io/merc0303/users-service, newTag: latest}
-  - {name: ghcr.io/merc0303/orders-service, newTag: latest}
-  - {name: ghcr.io/merc0303/inventory-service, newTag: latest}
+  - {name: ghcr.io/merc0303/users-service, newTag: 5fce9cac44e2f27a25f7c27f304d75140b3d57c6}
+  - {name: ghcr.io/merc0303/orders-service, newTag: 5fce9cac44e2f27a25f7c27f304d75140b3d57c6}
+  - {name: ghcr.io/merc0303/inventory-service, newTag: 5fce9cac44e2f27a25f7c27f304d75140b3d57c6}
